@@ -17,7 +17,7 @@ ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=ce
 SAMPLE_RATE = 16000  # YAMNet requires 16kHz mono audio
 DURATION = 1.0       # Chunk duration in seconds to evaluate
 INTERVAL = 0.5       # How often to pull a new chunk (sliding window effect)
-CONFIDENCE_THRESHOLD = 0.3  # Sensitivity threshold for triggers
+CONFIDENCE_THRESHOLD = 0.25  # Sensitivity threshold for triggers
 MODEL_URL = 'https://tfhub.dev/google/yamnet/1'
 
 print("Loading YAMNet model from TensorFlow Hub...")
@@ -32,7 +32,17 @@ with tf.io.gfile.GFile(class_map_path) as csvfile:
         class_names.append(row['display_name'])
 
 # Identify potential target indices (YAMNet includes classes like 'Gunshot', 'Explosion', etc.)
-target_classes = ['Gunshot', 'Explosion', 'Cap gun', 'Machine gun']
+target_classes = [
+    'Gunshot',
+    'Gunshot, gunfire',
+    'Explosion',
+    'Cap gun',
+    'Machine gun',
+    'Fusillade',
+    'Firecracker',
+    'Fireworks',
+    'Boom',
+]
 target_indices = [class_names.index(c) for c in target_classes if c in class_names]
 print(f"Monitoring for classes: {target_classes} (Indices: {target_indices})")
 print("Available audio devices:")
