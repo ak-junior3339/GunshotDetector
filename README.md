@@ -6,7 +6,16 @@ A simple Python project that listens to the microphone and uses YAMNet from Tens
 
 - Live microphone input capture
 - Audio classification using YAMNet
-- Detects classes such as Gunshot, Explosion, Cap gun, and Machine gun
+- Detects classes such as 
+    'Gunshot',
+    'Gunshot, gunfire',
+    'Explosion',
+    'Cap gun',
+    'Machine gun',
+    'Fusillade',
+    'Firecracker',
+    'Fireworks',
+    'Boom',
 - Runs on macOS using the Core Audio input device
 
 ## Requirements
@@ -56,4 +65,4 @@ A simple Python project that listens to the microphone and uses YAMNet from Tens
 
 ## Important
 
-This project is for research and experimentation. Real-world gunshot detection requires careful calibration, testing, and often a more specialized model trained on gunshot audio data.
+This project is for research and experimentation. Real-world gunshot detection requires careful calibration, testing, and often a more specialized model trained on gunshot audio data. This is a sub repo for a another project
