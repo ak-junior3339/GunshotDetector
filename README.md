@@ -10,6 +10,8 @@ The monitor reports the highest-scoring matching YAMNet class and its confidence
 ## Features
 
 - Live mono microphone input at 16 kHz
+- Live camera preview using OpenCV
+- Saves a camera snapshot in `alert_images/` when an audio alert fires
 - Audio classification using YAMNet
 - Separate HIGH and MEDIUM alert tiers with configurable confidence thresholds
 - Per-tier cooldowns to avoid repeated alerts for the same sustained sound
@@ -57,6 +59,9 @@ The monitor reports the highest-scoring matching YAMNet class and its confidence
 ## Notes
 
 - The script uses the default input device configured by `sounddevice`.
+- The script uses camera index `0` by default. Change `CAMERA_INDEX` in `GunFire&Crowd.py` for another camera.
+- Press `q` in the live camera window to stop the monitor. Press Ctrl+C in the terminal also stops it.
+- Alert snapshots are saved as JPEG files under `alert_images/`.
 - The model processes one-second audio blocks every 0.5 seconds, so overlapping blocks may be analyzed.
 - HIGH alerts use a default threshold of `0.25` and a five-second cooldown.
 - MEDIUM alerts use a default threshold of `0.35` and an eight-second cooldown.
