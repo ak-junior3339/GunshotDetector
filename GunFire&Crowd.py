@@ -12,10 +12,6 @@ guessing upfront. Once you've done that, switch to the suppression
 version (live_mic_threat_monitor_with_confuser.py) for demos or live
 deployment.
  
-This uses YAMNet's raw pretrained class probabilities directly (no custom
-classifier head yet) — good for testing your mic setup and tuning
-thresholds before investing in the transfer-learning step from the
-earlier notebook.
  
 Install:
     pip install tensorflow tensorflow-hub sounddevice numpy certifi
@@ -50,7 +46,9 @@ SAMPLE_RATE = 16000 # YAMNet works/requires 16kHz mono audio
 DURATION = 1.0 # CHUNK DURATION
 INTERVAL = 0.5 # HOW FREQ. CHUNK IS being feeded to model
 MODEL_URL = 'https://tfhub.dev/google/yamnet/1' # Base model of yamnet
+# Camera 0 is usually the built-in webcam; change this for an external camera.
 CAMERA_INDEX = 0
+# Alert frames are saved here instead of being kept only in the live preview.
 ALERT_IMAGE_DIR = Path("alert_images")
 
 
@@ -126,7 +124,9 @@ print(sd.query_devices())
 # (e.g. 3 seconds of continuous gunfire) doesn't spam a new alert every
 # 0.5s while INTERVAL keeps pulling overlapping chunks.
 _last_alert_at = {tier_name: 0.0 for tier_name in THREAT_TIERS}
+# The audio callback queues events so file I/O stays in the main camera loop.
 _alert_events = queue.Queue()
+# The latest camera frame is shared briefly between the camera loop and alerts.
 _latest_frame = None
 _frame_lock = threading.Lock()
 
@@ -172,6 +172,7 @@ def audio_callback(indata, frames, time_info, status):
  
         _last_alert_at[tier_name] = now
         detected_name = class_names[best_idx]
+        # The main loop uses this event to save the corresponding camera frame.
         _alert_events.put((tier_name, detected_name, best_score))
         print(f"\n{tier['label']} ALERT! Detected '{detected_name}' "
               f"— confidence: {best_score:.2f}")
@@ -184,6 +185,7 @@ block_size = int(SAMPLE_RATE * DURATION)
 print(f"\nListening live (HIGH threshold={THREAT_TIERS['HIGH']['threshold']}, "
       f"MEDIUM threshold={THREAT_TIERS['MEDIUM']['threshold']}). Press Ctrl+C to stop.")
 
+# Open the camera before starting the audio stream so both inputs are available.
 camera = cv2.VideoCapture(CAMERA_INDEX)
 if not camera.isOpened():
     raise RuntimeError(f"Could not open camera at index {CAMERA_INDEX}.")
@@ -208,6 +210,7 @@ try:
             with _frame_lock:
                 _latest_frame = frame.copy()
 
+            # Drain all audio alerts received since the previous camera frame.
             while True:
                 try:
                     tier_name, detected_name, confidence = _alert_events.get_nowait()
@@ -220,6 +223,7 @@ try:
                 )
                 with _frame_lock:
                     alert_frame = None if _latest_frame is None else _latest_frame.copy()
+                # Save the most recent frame at the time the alert is handled.
                 if alert_frame is not None and cv2.imwrite(str(image_path), alert_frame):
                     print(f"Saved alert image: {image_path} "
                           f"(confidence: {confidence:.2f})")
@@ -230,6 +234,7 @@ try:
 except KeyboardInterrupt:
     print("\nStopping audio threat monitor.")
 finally:
+    # Always release hardware and close the preview window on exit.
     camera.release()
     cv2.destroyAllWindows()
  
