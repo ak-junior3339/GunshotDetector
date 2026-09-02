@@ -22,11 +22,16 @@ Install:
 """
 
 import csv
+from datetime import datetime
 import os
+from pathlib import Path
+import queue
 import ssl
+import threading
 import time
  
 import certifi
+import cv2
 import numpy as np
 import sounddevice as sd
 import tensorflow as tf
@@ -45,6 +50,8 @@ SAMPLE_RATE = 16000 # YAMNet works/requires 16kHz mono audio
 DURATION = 1.0 # CHUNK DURATION
 INTERVAL = 0.5 # HOW FREQ. CHUNK IS being feeded to model
 MODEL_URL = 'https://tfhub.dev/google/yamnet/1' # Base model of yamnet
+CAMERA_INDEX = 0
+ALERT_IMAGE_DIR = Path("alert_images")
 
 
 # There are two severity tiers, each with its own class list and confidence bar.
@@ -119,6 +126,9 @@ print(sd.query_devices())
 # (e.g. 3 seconds of continuous gunfire) doesn't spam a new alert every
 # 0.5s while INTERVAL keeps pulling overlapping chunks.
 _last_alert_at = {tier_name: 0.0 for tier_name in THREAT_TIERS}
+_alert_events = queue.Queue()
+_latest_frame = None
+_frame_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------
@@ -162,6 +172,7 @@ def audio_callback(indata, frames, time_info, status):
  
         _last_alert_at[tier_name] = now
         detected_name = class_names[best_idx]
+        _alert_events.put((tier_name, detected_name, best_score))
         print(f"\n{tier['label']} ALERT! Detected '{detected_name}' "
               f"— confidence: {best_score:.2f}")
  
@@ -172,7 +183,13 @@ def audio_callback(indata, frames, time_info, status):
 block_size = int(SAMPLE_RATE * DURATION)
 print(f"\nListening live (HIGH threshold={THREAT_TIERS['HIGH']['threshold']}, "
       f"MEDIUM threshold={THREAT_TIERS['MEDIUM']['threshold']}). Press Ctrl+C to stop.")
- 
+
+camera = cv2.VideoCapture(CAMERA_INDEX)
+if not camera.isOpened():
+    raise RuntimeError(f"Could not open camera at index {CAMERA_INDEX}.")
+
+ALERT_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+
 try:
     with sd.InputStream(
         device=sd.default.device,
@@ -183,7 +200,36 @@ try:
         callback=audio_callback,
     ):
         while True:
-            sd.sleep(int(INTERVAL * 1000))
+            ret, frame = camera.read()
+            if not ret:
+                print("Camera frame could not be read.", flush=True)
+                break
+
+            with _frame_lock:
+                _latest_frame = frame.copy()
+
+            while True:
+                try:
+                    tier_name, detected_name, confidence = _alert_events.get_nowait()
+                except queue.Empty:
+                    break
+
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                image_path = ALERT_IMAGE_DIR / (
+                    f"{timestamp}_{tier_name}_{detected_name.replace(' ', '_')}.jpg"
+                )
+                with _frame_lock:
+                    alert_frame = None if _latest_frame is None else _latest_frame.copy()
+                if alert_frame is not None and cv2.imwrite(str(image_path), alert_frame):
+                    print(f"Saved alert image: {image_path} "
+                          f"(confidence: {confidence:.2f})")
+
+            cv2.imshow("GunFire&Crowd - Live Camera", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 except KeyboardInterrupt:
     print("\nStopping audio threat monitor.")
+finally:
+    camera.release()
+    cv2.destroyAllWindows()
  
