@@ -44,7 +44,7 @@ ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=ce
 SAMPLE_RATE = 16000 # YAMNet works/requires 16kHz mono audio
 DURATION = 1.0 # CHUNK DURATION
 INTERVAL = 0.5 # HOW FREQ. CHUNK IS being feeded to model
-MODEL_URL = 'https://tfhub.dev/google/yamnet/1'. # Base model of yamnet 
+MODEL_URL = 'https://tfhub.dev/google/yamnet/1' # Base model of yamnet
 
 
 # There are two severity tiers, each with its own class list and confidence bar.
@@ -86,6 +86,13 @@ THREAT_TIERS = {
 print("Loading the YAMnet model from tensorflow hub")
 model = hub.load(MODEL_URL)
 
+class_map_path = model.class_map_path().numpy()
+class_names = []
+with tf.io.gfile.GFile(class_map_path) as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        class_names.append(row['display_name'])
+
 # Resolve each tier's class names to indices once, up front. Warn (rather
 # than silently drop) if a configured class name doesn't match anything —
 # that usually means a typo, and you want to know immediately rather than
@@ -98,7 +105,7 @@ for tier_name, tier in THREAT_TIERS.items():
         else:
             print(f"[WARNING] '{cls_name}' not found in YAMNet's class list — "
                   f"check spelling. Skipping.")
-    tier["indices"] = indices. # storing all the available 
+    tier["indices"] = indices
     print(f"{tier_name} tier monitoring {len(indices)} classes: {tier['classes']}")
  
 print("\nAvailable audio devices:")
