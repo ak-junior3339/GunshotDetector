@@ -1,22 +1,19 @@
-# GunShotDetector
+# GunFire&Crowd
 
-A simple Python project that listens to the microphone and uses YAMNet from TensorFlow Hub to detect gunshot-like sounds in real time.
+A real-time microphone monitor that uses the pretrained YAMNet model from TensorFlow Hub to identify two types of audio threats:
+
+- **HIGH:** gunfire and explosions
+- **MEDIUM:** crowd distress sounds such as shouting, yelling, screaming, and booing
+
+The monitor reports the highest-scoring matching YAMNet class and its confidence. It is intended for testing microphone input and tuning thresholds, not as a production safety system.
 
 ## Features
 
-- Live microphone input capture
+- Live mono microphone input at 16 kHz
 - Audio classification using YAMNet
-- Detects classes such as 
-    'Gunshot',
-    'Gunshot, gunfire',
-    'Explosion',
-    'Cap gun',
-    'Machine gun',
-    'Fusillade',
-    'Firecracker',
-    'Fireworks',
-    'Boom',
-- Runs on macOS using the Core Audio input device
+- Separate HIGH and MEDIUM alert tiers with configurable confidence thresholds
+- Per-tier cooldowns to avoid repeated alerts for the same sustained sound
+- Prints the available audio devices before listening
 
 ## Requirements
 
@@ -51,18 +48,21 @@ A simple Python project that listens to the microphone and uses YAMNet from Tens
    export CURL_CA_BUNDLE="$SSL_CERT_FILE"
    ```
 
-4. Run the detector:
+4. Run the gunfire and crowd monitor:
 
    ```bash
-   python gunshotDetection.py
+   python 'GunFire&Crowd.py'
    ```
 
 ## Notes
 
-- The script uses the default microphone device.
-- YAMNet is a general audio model, so this is a prototype detector rather than a professionally trained gunshot-specific detector.
-- The script listens continuously until you press Ctrl+C.
+- The script uses the default input device configured by `sounddevice`.
+- The model processes one-second audio blocks every 0.5 seconds, so overlapping blocks may be analyzed.
+- HIGH alerts use a default threshold of `0.25` and a five-second cooldown.
+- MEDIUM alerts use a default threshold of `0.35` and an eight-second cooldown.
+- Press Ctrl+C to stop listening.
+- To use a different microphone, change `sd.default.device` or select a device after reviewing the printed device list.
 
 ## Important
 
-This project is for research and experimentation. Real-world gunshot detection requires careful calibration, testing, and often a more specialized model trained on gunshot audio data. This is a sub repo for a another project
+This project is for research and experimentation. YAMNet is a general-purpose audio model and can produce false positives or miss relevant sounds. Real-world gunshot or crowd-threat detection requires careful calibration, field testing, and often a specialized model trained on representative audio data.
