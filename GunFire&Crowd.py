@@ -27,16 +27,17 @@ import threading
 import time
  
 import certifi
-import cv2
-import numpy as np
-import sounddevice as sd
-import tensorflow as tf
-import tensorflow_hub as hub
 
 os.environ.setdefault('SSL_CERT_FILE', certifi.where())
 os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 os.environ.setdefault('CURL_CA_BUNDLE', certifi.where())
 ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
+
+import cv2
+import numpy as np
+import sounddevice as sd
+import tensorflow as tf
+import tensorflow_hub as hub
 
 # ---------------------------------------------------------------------
 # 1. CONFIGURATION
@@ -50,6 +51,8 @@ MODEL_URL = 'https://tfhub.dev/google/yamnet/1' # Base model of yamnet
 CAMERA_INDEX = 0
 # Alert frames are saved here instead of being kept only in the live preview.
 ALERT_IMAGE_DIR = Path("alert_images")
+# Keep each alert visible in the camera window long enough to read.
+ALERT_DISPLAY_SEC = 5.0
 
 
 # There are two severity tiers, each with its own class list and confidence bar.
@@ -68,7 +71,7 @@ THREAT_TIERS = {
             "Artillery fire",
             "Explosion",
         ],
-        "threshold": 0.25,
+        "threshold": 0.3,
         "cooldown_sec": 5.0,
     },
     "MEDIUM": {
@@ -191,6 +194,7 @@ if not camera.isOpened():
     raise RuntimeError(f"Could not open camera at index {CAMERA_INDEX}.")
 
 ALERT_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+display_alerts = []
 
 try:
     with sd.InputStream(
@@ -227,6 +231,43 @@ try:
                 if alert_frame is not None and cv2.imwrite(str(image_path), alert_frame):
                     print(f"Saved alert image: {image_path} "
                           f"(confidence: {confidence:.2f})")
+
+                display_alerts.append({
+                    "tier": tier_name,
+                    "detected_name": detected_name,
+                    "confidence": confidence,
+                    "expires_at": time.monotonic() + ALERT_DISPLAY_SEC,
+                })
+
+            now = time.monotonic()
+            display_alerts = [
+                alert for alert in display_alerts if alert["expires_at"] > now
+            ]
+            for alert_index, alert in enumerate(display_alerts):
+                alert_text = (
+                    f"{alert['tier']} ALERT: {alert['detected_name']} "
+                    f"({alert['confidence']:.2f})"
+                )
+                text_position = (20, 40 + alert_index * 45)
+                text_size, _baseline = cv2.getTextSize(
+                    alert_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+                )
+                top_left = (text_position[0] - 10, text_position[1] - 28)
+                bottom_right = (
+                    text_position[0] + text_size[0] + 10,
+                    text_position[1] + 10,
+                )
+                cv2.rectangle(frame, top_left, bottom_right, (0, 0, 0), -1)
+                cv2.putText(
+                    frame,
+                    alert_text,
+                    text_position,
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255) if alert["tier"] == "HIGH" else (0, 165, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
 
             cv2.imshow("GunFire&Crowd - Live Camera", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
