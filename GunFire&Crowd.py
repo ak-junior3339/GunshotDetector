@@ -72,7 +72,7 @@ THREAT_TIERS = {
             "Explosion",
         ],
         "threshold": 0.3,
-        "cooldown_sec": 5.0,
+        "cooldown_sec": 3.0,
     },
     "MEDIUM": {
         "label": "CATEGORY :-> CROWD DISTRESS",
@@ -83,7 +83,7 @@ THREAT_TIERS = {
             "Booing",
         ],
         "threshold": 0.35,
-        "cooldown_sec": 8.0,
+        "cooldown_sec": 5.0,
     },
 }
 
